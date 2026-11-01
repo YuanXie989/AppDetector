@@ -1,0 +1,60 @@
+
+name: Build AppDetector APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'AppDetector-mobile-build.zip'
+      - '.github/workflows/main.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Extract Android project
+        run: |
+          unzip -q AppDetector-mobile-build.zip -d app-source
+
+      - name: Build APK
+        run: |
+          GRADLEW=$(find app-source -type f -name gradlew | head -n 1)
+          if [ -z "$GRADLEW" ]; then
+            echo "Gradle wrapper not found"
+            exit 1
+          fi
+          PROJECT_DIR=$(dirname "$GRADLEW")
+          cd "$PROJECT_DIR"
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Collect APK
+        run: |
+          APK=$(find app-source -type f -path '*/build/outputs/apk/*' -name '*.apk' | head -n 1)
+          if [ -z "$APK" ]; then
+            echo "APK not found"
+            exit 1
+          fi
+          cp "$APK" "$GITHUB_WORKSPACE/AppDetector.apk"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: AppDetector-APK
+          path: AppDetector.apk
